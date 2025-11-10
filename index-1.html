@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Previsor de Casas — Demo</title>
+  <style>
+    :root{
+      --bg:#f6fbff;
+      --card:#ffffff;
+      --primary:#0066cc;
+      --accent:#ff8a00;
+      --muted:#6b7280;
+      --glass: rgba(255,255,255,0.7);
+      --shadow: 0 8px 30px rgba(13,30,44,0.08);
+      --success:#16a34a;
+    }
+    *{box-sizing:border-box;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: linear-gradient(180deg,#e9f3ff 0%, #f6fbff 100%);
+      padding:28px;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:1100px;
+      display:grid;
+      grid-template-columns: 1fr 420px;
+      gap:28px;
+      align-items:start;
+    }
+
+    /* left — main card */
+    .card{
+      background:var(--card);
+      border-radius:14px;
+      padding:28px;
+      box-shadow:var(--shadow);
+    }
+    header.app-title{
+      display:flex;
+      gap:16px;
+      align-items:center;
+      margin-bottom:18px;
+    }
+    .logo{
+      width:64px;height:64px;border-radius:12px;
+      background: linear-gradient(135deg,var(--primary), #58a6ff);
+      display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;
+      box-shadow: 0 6px 18px rgba(6,78,146,0.12);
+    }
+    h1{margin:0;font-size:28px;color:#0f172a}
+    p.lead{margin:10px 0 0;color:var(--muted)}
+
+    .controls{margin-top:18px;display:flex;flex-direction:column;gap:16px}
+    .control-row{display:flex;gap:12px;align-items:center;}
+    .control-row .left{flex:1}
+    .control-row label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+
+    input[type="range"]{
+      -webkit-appearance:none;height:10px;border-radius:8px;background:linear-gradient(90deg,var(--primary), #7fb3ff);
+      outline:none;width:100%;
+    }
+    input[type="number"]{
+      width:120px;padding:10px;border-radius:8px;border:1px solid #e6eefb;background:#f8fbff;font-weight:600;
+      text-align:center;
+    }
+
+    .result{
+      margin-top:12px;padding:14px;border-radius:10px;background:linear-gradient(90deg,#fff,#f7fbff);display:flex;align-items:center;gap:14px;
+      border:1px solid #e6f0ff;
+    }
+    .price{
+      font-size:22px;font-weight:800;color:var(--primary);
+    }
+    .sub{color:var(--muted);font-size:13px}
+
+    /* right — stats / graphic */
+    .side{
+      display:flex;flex-direction:column;gap:18px;
+    }
+    .card.small{padding:18px;border-radius:14px}
+    .arrow{
+      display:flex;gap:12px;align-items:center;
+    }
+    .arrow .bubble{
+      width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent), #ffb37a);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;
+      box-shadow: 0 8px 24px rgba(255,138,0,0.14);
+    }
+    .arrow .txt{font-size:13px;color:#06233b}
+
+    /* chart */
+    .chart-box{background:linear-gradient(180deg,#ffffff,#fbfdff);border-radius:10px;padding:12px;border:1px solid #ebf6ff;}
+    canvas{width:100%;height:180px;display:block;}
+
+    /* responsive */
+    @media (max-width:980px){
+      .wrap{grid-template-columns:1fr; padding-bottom: 20px}
+      .side{order:2}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header class="app-title">
+        <div class="logo">PC</div>
+        <div>
+          <h1>Previsor de Casas</h1>
+          <p class="lead">Estimativa rápida do preço de uma casa a partir da área (m²). Ótimo para protótipos e apresentações.</p>
+        </div>
+      </header>
+
+      <section class="controls" aria-label="Controles">
+        <div>
+          <label for="areaRange">Área (m²)</label>
+          <div class="control-row">
+            <div class="left">
+              <input id="areaRange" type="range" min="20" max="1000" step="1" value="100">
+            </div>
+            <div>
+              <input id="areaNumber" type="number" min="20" max="1000" step="1" value="100">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label>Tipo (opcional)</label>
+          <div style="display:flex;gap:8px;">
+            <select id="tipo" style="padding:10px;border-radius:8px;border:1px solid #e6eefb;background:#fff;">
+              <option value="padrao">Padrão</option>
+              <option value="novo">Imóvel novo</option>
+              <option value="reformado">Reformado</option>
+            </select>
+            <button id="btnEstimate" style="padding:10px 14px;border-radius:8px;border:none;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;">Estimar</button>
+          </div>
+        </div>
+
+        <div class="result" aria-live="polite">
+          <div style="flex:1">
+            <div class="sub">Preço estimado</div>
+            <div class="price" id="priceText">R$ 0,00</div>
+            <div class="sub" id="subText">Com base na área informada.</div>
+          </div>
+          <div style="text-align:right;">
+            <div id="delta" style="font-weight:700;color:var(--success)">▲ 0%</div>
+            <div class="sub" style="font-size:12px">Variação vs média</div>
+          </div>
+        </div>
+
+        <small style="color:var(--muted);display:block;margin-top:8px">Modelo: regressão linear simples (apenas para demonstração). Para produção, treine/valide em dados reais.</small>
+      </section>
+    </div>
+
+    <aside class="side">
+      <div class="card small">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <strong>Visão rápida</strong>
+            <div style="color:var(--muted);font-size:13px">Coeficiente linear aplicado e histórico de pontos</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:20px;font-weight:800;color:var(--primary)" id="coefVal">—</div>
+            <div style="font-size:12px;color:var(--muted)">R$ / m²</div>
+          </div>
+        </div>
+        <div style="height:12px;"></div>
+        <div class="chart-box">
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <div class="card small">
+        <div class="arrow">
+          <div class="bubble">AI</div>
+          <div>
+            <div style="font-weight:700">Interpretação</div>
+            <div style="color:var(--muted);font-size:13px">Valor estimado com base em uma regressão linear do dataset de exemplo.</div>
+          </div>
+        </div>
+        <div style="height:8px"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button id="downloadBtn" style="flex:1;padding:10px;border-radius:8px;border:1px solid #e6f0ff;background:#fff;cursor:pointer;">Baixar CSV exemplo</button>
+          <button id="resetBtn" style="padding:10px;border-radius:8px;border:none;background:#ffedd5;color:#b45309;cursor:pointer;">Reset</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // --------------------------
+    // Dados de exemplo (mesmo dataset do projeto)
+    // --------------------------
+    const dataset = [
+      {area:40, preco:180},
+      {area:50, preco:210},
+      {area:60, preco:240},
+      {area:70, preco:270},
+      {area:80, preco:310},
+      {area:90, preco:340},
+      {area:100, preco:380},
+      {area:120, preco:440},
+      {area:140, preco:500},
+      {area:160, preco:560},
+      {area:180, preco:620},
+      {area:200, preco:680},
+      {area:220, preco:740},
+      {area:250, preco:820},
+      {area:300, preco:950},
+      {area:350, preco:1100},
+      {area:400, preco:1250},
+      {area:450, preco:1400},
+      {area:500, preco:1550},
+    ];
+
+    // Coeficientes da regressão linear (pré-calculados)
+    // preco = a * area + b
+    const a = 2.9524892816519372;
+    const b = 75.71791057835327;
+
+    // DOM
+    const areaRange = document.getElementById('areaRange');
+    const areaNumber = document.getElementById('areaNumber');
+    const priceText = document.getElementById('priceText');
+    const subText = document.getElementById('subText');
+    const coefVal = document.getElementById('coefVal');
+    const delta = document.getElementById('delta');
+    const btnEstimate = document.getElementById('btnEstimate');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    coefVal.textContent = a.toFixed(3);
+
+    // sincroniza inputs
+    areaRange.addEventListener('input', e=>{
+      areaNumber.value = e.target.value;
+      updateEstimate();
+    });
+    areaNumber.addEventListener('input', e=>{
+      let v = Number(e.target.value);
+      if(isNaN(v)) v = 100;
+      if(v < 20) v = 20;
+      if(v > 1000) v = 1000;
+      areaNumber.value = v;
+      areaRange.value = v;
+      updateEstimate();
+    });
+
+    btnEstimate.addEventListener('click', updateEstimate);
+    resetBtn.addEventListener('click', ()=>{
+      areaRange.value = 100;
+      areaNumber.value = 100;
+      updateEstimate();
+    });
+
+    downloadBtn.addEventListener('click', ()=>{
+      const csv = 'area,preco\\n' + dataset.map(r => `${r.area},${r.preco}`).join('\\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const ael = document.createElement('a');
+      ael.href = url;
+      ael.download = 'casas_exemplo.csv';
+      document.body.appendChild(ael);
+      ael.click();
+      ael.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    function predict(area){
+      // ajuste simples por tipo (pequeno fudge apenas para demo)
+      const tipo = document.getElementById('tipo').value;
+      let pred = a * area + b;
+      if(tipo === 'novo') pred *= 1.08;
+      if(tipo === 'reformado') pred *= 1.03;
+      return pred;
+    }
+
+    function formatBR(value){
+      // assume value is number in same units as dataset (thousands)
+      // We'll show as "R$ X.XXX,XX"
+      const v = Number(value);
+      return v.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+    }
+
+    function updateEstimate(){
+      const area = Number(areaNumber.value || areaRange.value);
+      const p = predict(area);
+      // dataset preco interpreted as 'valor' (no scaling)
+      priceText.textContent = formatBR(p * 1000); // convertimos "mil" para reais
+      subText.textContent = `Área: ${area} m² · Modelo linear: ${a.toFixed(3)} × area + ${b.toFixed(2)}`;
+      // comparação contra média
+      const mean = dataset.reduce((s, r)=>s + r.preco, 0)/dataset.length;
+      const pct = ((p - mean) / mean) * 100;
+      delta.textContent = `${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}%`;
+      delta.style.color = pct >= 0 ? 'var(--success)' : '#ef4444';
+
+      // animar ponto no gráfico
+      drawChart(area, p);
+    }
+
+    // ---------------------------
+    // Chart (canvas) — minimal
+    // ---------------------------
+    const canvas = document.getElementById('chart');
+    const ctx = canvas.getContext('2d');
+    function resizeCanvas(){
+      canvas.width = canvas.clientWidth * devicePixelRatio;
+      canvas.height = canvas.clientHeight * devicePixelRatio;
+      ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      drawChart(Number(areaNumber.value || areaRange.value), predict(Number(areaNumber.value || areaRange.value)));
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function drawChart(currentArea, currentPred){
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      // clear
+      ctx.clearRect(0,0,w,h);
+      // padding
+      const pad = 18;
+      const plotW = w - pad*2;
+      const plotH = h - pad*2;
+
+      // scales
+      const minA = Math.min(...dataset.map(d=>d.area));
+      const maxA = Math.max(...dataset.map(d=>d.area));
+      const minP = Math.min(...dataset.map(d=>d.preco));
+      const maxP = Math.max(...dataset.map(d=>d.preco));
+      function sx(a){ return pad + ((a - minA) / (maxA - minA)) * plotW; }
+      function sy(p){ return pad + plotH - ((p - minP) / (maxP - minP)) * plotH; }
+
+      // axes light grid
+      ctx.strokeStyle = '#eef7ff';
+      ctx.lineWidth = 1;
+      for(let i=0;i<5;i++){
+        const y = pad + (i/4)*plotH;
+        ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(pad+plotW,y); ctx.stroke();
+      }
+
+      // draw dataset points
+      ctx.fillStyle = '#0f172a';
+      dataset.forEach(d=>{
+        ctx.beginPath();
+        ctx.arc(sx(d.area), sy(d.preco), 3.5, 0, Math.PI*2);
+        ctx.fill();
+      });
+
+      // draw regression line across extremes
+      const p1 = a*minA + b;
+      const p2 = a*maxA + b;
+      ctx.strokeStyle = '#58a6ff';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(sx(minA), sy(p1));
+      ctx.lineTo(sx(maxA), sy(p2));
+      ctx.stroke();
+
+      // draw current predicted point (highlight)
+      const predInDatasetScale = currentPred;
+      ctx.fillStyle = '#ff8a00';
+      ctx.beginPath();
+      ctx.arc(sx(currentArea), sy(predInDatasetScale), 6, 0, Math.PI*2);
+      ctx.fill();
+
+      // label
+      ctx.fillStyle = '#06233b';
+      ctx.font = '12px Inter, sans-serif';
+      const label = `Previsão: ${formatBR(currentPred*1000)}`;
+      ctx.fillText(label, sx(currentArea)+8, sy(predInDatasetScale)-8);
+    }
+
+    // inicia
+    updateEstimate();
+
+    async function prever(area) {
+  const r = await fetch(`http://localhost:3000/prever?area=100${area}`);
+  const data = await r.json();
+  return data.preco;
+}
+  </script>
+</body>
+</html>
